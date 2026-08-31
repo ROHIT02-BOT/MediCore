@@ -19,7 +19,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang='en' suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans min-h-screen bg-background text-foreground antialiased flex flex-col`}>
+      <body className={`${inter.variable} font-sans min-h-screen bg-background text-foreground antialiased flex flex-col`} suppressHydrationWarning>
         <ThemeProvider attribute='class' defaultTheme='system' enableSystem disableTransitionOnChange>
           <Navbar />
           <main className='flex-1 flex flex-col'>
