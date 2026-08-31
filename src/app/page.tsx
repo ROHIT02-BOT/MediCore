@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Shield, FileText, Bell, Activity, MessageSquare, Lock, ChevronRight } from 'lucide-react';
 
@@ -22,15 +22,13 @@ export default function Home() {
             SecureMed helps you securely organize your medical records, medication reminders, emergency information, and everyday health tools in one place.
           </p>
           <div className='flex flex-col sm:flex-row gap-4 w-full sm:w-auto justify-center'>
-            <Button size='lg' className='h-12 px-8 text-base group' asChild>
-              <Link href='/register'>
-                Get Started
-                <ChevronRight className='ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform' />
-              </Link>
-            </Button>
-            <Button size='lg' variant='outline' className='h-12 px-8 text-base' asChild>
-              <Link href='/login'>Login</Link>
-            </Button>
+            <Link href='/register' className={buttonVariants({ variant: 'default', size: 'lg', className: 'h-12 px-8 text-base group' })}>
+              Get Started
+              <ChevronRight className='ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform' />
+            </Link>
+            <Link href='/login' className={buttonVariants({ variant: 'outline', size: 'lg', className: 'h-12 px-8 text-base' })}>
+              Login
+            </Link>
           </div>
         </div>
       </section>

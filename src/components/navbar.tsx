@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Shield, Menu, X, Moon, Sun, LogOut, Settings, User } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -133,12 +133,12 @@ export function Navbar() {
             </div>
           ) : (
             <div className='hidden md:flex gap-2'>
-              <Button variant='ghost' asChild>
-                <Link href='/login'>Login</Link>
-              </Button>
-              <Button asChild>
-                <Link href='/register'>Get Started</Link>
-              </Button>
+              <Link href='/login' className={buttonVariants({ variant: 'ghost' })}>
+                Login
+              </Link>
+              <Link href='/register' className={buttonVariants({ variant: 'default' })}>
+                Get Started
+              </Link>
             </div>
           )}
 
@@ -189,12 +189,12 @@ export function Navbar() {
                   </>
                 ) : (
                   <div className='flex flex-col gap-4 mt-4'>
-                    <Button asChild onClick={() => setIsOpen(false)}>
-                      <Link href='/login'>Login</Link>
-                    </Button>
-                    <Button variant='outline' asChild onClick={() => setIsOpen(false)}>
-                      <Link href='/register'>Create Account</Link>
-                    </Button>
+                    <Link href='/login' onClick={() => setIsOpen(false)} className={buttonVariants({ variant: 'default' })}>
+                      Login
+                    </Link>
+                    <Link href='/register' onClick={() => setIsOpen(false)} className={buttonVariants({ variant: 'outline' })}>
+                      Create Account
+                    </Link>
                   </div>
                 )}
               </div>

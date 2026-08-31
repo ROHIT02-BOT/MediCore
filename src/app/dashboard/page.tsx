@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { FileText, Bell, Phone, Activity, ArrowRight, PlusCircle, MessageSquare, Plus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 
 export default function DashboardPage() {
@@ -117,11 +117,9 @@ export default function DashboardPage() {
             <CardContent className='flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground'>
               <Bell className='h-10 w-10 mb-4 opacity-20' />
               <p className='mb-4'>No upcoming medications or events for today.</p>
-              <Button variant='outline' size='sm' asChild>
-                <Link href='/reminders'>
-                  <Plus className='mr-2 h-4 w-4' /> Add Reminder
-                </Link>
-              </Button>
+              <Link href='/reminders' className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                <Plus className='mr-2 h-4 w-4' /> Add Reminder
+              </Link>
             </CardContent>
           </Card>
         </section>
@@ -134,16 +132,18 @@ export default function DashboardPage() {
               <Activity className='h-10 w-10 mb-4 opacity-20' />
               <h3 className='font-medium text-foreground mb-1'>No activity yet</h3>
               <p className='mb-4 text-sm'>Your recent health activity will appear here.</p>
-              <Button variant='default' size='sm' asChild>
-                <Link href='/medical-records'>
-                  <Plus className='mr-2 h-4 w-4' /> Upload Your First Record
+              <div className='flex gap-2 w-full sm:w-auto'>
+                <Link href='/medical-records' className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                  View Records
                 </Link>
-              </Button>
+                <Link href='/reminders' className={buttonVariants({ variant: 'default', size: 'sm' })}>
+                  <Plus className='h-4 w-4 mr-1' /> Add Reminder
+                </Link>
+              </div>
             </CardContent>
           </Card>
         </section>
       </div>
     </div>
   );
-}
 
