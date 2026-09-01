@@ -92,16 +92,14 @@ export function Navbar() {
           {user ? (
             <div className='hidden md:block'>
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant='ghost' className='relative h-8 w-8 rounded-full'>
-                    <Avatar className='h-8 w-8'>
-                      <AvatarFallback className='bg-primary/10 text-primary'>
-                        {user.email?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className='w-56' align='end' forceMount>
+                <DropdownMenuTrigger className="relative h-8 w-8 rounded-full inline-flex items-center justify-center hover:bg-accent transition-colors">
+  <Avatar className="h-8 w-8">
+    <AvatarFallback className="bg-primary/10 text-primary">
+      {user.email?.charAt(0).toUpperCase()}
+    </AvatarFallback>
+  </Avatar>
+</DropdownMenuTrigger>
+                <DropdownMenuContent className='w-56' align='end'>
                   <div className='flex items-center justify-start gap-2 p-2'>
                     <div className='flex flex-col space-y-1 leading-none'>
                       <p className='font-medium'>{user.user_metadata?.full_name || 'User'}</p>
