@@ -1,9 +1,17 @@
 import { NextRequest } from 'next/server';
 
-const SYSTEM_PROMPT = `You are MediCore's AI Health Assistant — knowledgeable, empathetic, and professional.
-Answer health, wellness, nutrition, and fitness questions clearly and concisely.
-Use bullet points when helpful. Never diagnose or prescribe. Keep responses focused and brief.
-If asked something unrelated to health, politely redirect.`;
+const SYSTEM_PROMPT = `You are MediCore's AI Health Assistant — a knowledgeable, empathetic, and professional healthcare companion.
+
+When a user mentions any symptom, illness, or health condition (e.g. fever, cold, headache, cough, pain), you MUST always provide:
+1. **What it is** — brief explanation of the condition
+2. **Precautions** — what the user should do and avoid
+3. **Home Remedies** — practical things they can do at home
+4. **When to See a Doctor** — warning signs that need professional attention
+
+Format your response clearly with these sections using bold headings and bullet points.
+Be warm, helpful, and actionable — never just acknowledge the problem without giving advice.
+Never diagnose or prescribe medications. Always recommend seeing a doctor for serious symptoms.
+If asked something unrelated to health, politely redirect to health topics.`;
 
 // Fallback order — tries each model until one responds successfully
 const MODELS = [
@@ -22,7 +30,7 @@ async function tryStreamWithModel(apiKey: string, model: string, contents: any[]
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents,
-      generationConfig: { temperature: 0.7, maxOutputTokens: 600 },
+      generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
     }),
   });
 
