@@ -1,31 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
-const SYSTEM_PROMPT = `You are MediCore's AI Health Assistant — a knowledgeable, empathetic, and professional healthcare companion.
-
-Your role:
-- Answer general health, wellness, nutrition, fitness, and medical questions in a clear, friendly tone.
-- Always remind users that your advice is informational and not a substitute for professional medical advice.
-- Keep responses concise but complete — avoid overwhelming the user.
-- Use bullet points or short paragraphs for clarity when helpful.
-- Never diagnose diseases or prescribe medications.
-- If a question is outside health/wellness, politely redirect to health topics.`;
-
-// Try multiple models in order until one works
-const MODELS_TO_TRY = [
-  'gemini-3.6-flash',
-  'gemini-flash-latest',
-  'gemini-3.5-flash',
-];
-
-async function callGemini(apiKey: string, model: string, contents: any[]) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents }),
-  });
-  return res;
-}
+const SYSTEM_PROMPT = `You are MediCore's AI Health Assistant — knowledgeable, empathetic, and professional.
+Answer health, wellness, nutrition, and fitness questions clearly and concisely.
+Use bullet points when helpful. Never diagnose or prescribe. Keep responses focused and brief.
+If asked something unrelated to health, politely redirect.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,21 +11,21 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
-      return NextResponse.json(
-        { error: 'Gemini API key not configured.' },
-        { status: 500 }
-      );
+      return new Response(JSON.stringify({ error: 'Gemini API key not configured.' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // Build contents array with system prompt + conversation history
+    // Build contents: system context + full conversation history
     const contents = [
       {
         role: 'user',
-        parts: [{ text: SYSTEM_PROMPT + '\n\nPlease acknowledge you understand your role.' }],
+        parts: [{ text: SYSTEM_PROMPT }],
       },
       {
         role: 'model',
-        parts: [{ text: "Understood! I'm MediCore's AI Health Assistant, ready to provide helpful health and wellness information. How can I help you today?" }],
+        parts: [{ text: "Understood! I'm MediCore's AI Health Assistant. How can I help you today?" }],
       },
       ...messages.map((msg: { role: string; content: string }) => ({
         role: msg.role === 'user' ? 'user' : 'model',
@@ -55,36 +33,76 @@ export async function POST(req: NextRequest) {
       })),
     ];
 
-    // Try each model until one works
-    let lastError = '';
-    for (const model of MODELS_TO_TRY) {
-      try {
-        const res = await callGemini(apiKey, model, contents);
-        const data = await res.json();
+    // Use streamGenerateContent for fast streaming responses
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
 
-        if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-          return NextResponse.json({
-            content: data.candidates[0].content.parts[0].text,
-          });
-        }
+    const geminiRes = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 512,
+        },
+      }),
+    });
 
-        lastError = data.error?.message || `Model ${model} failed`;
-        console.log(`Model ${model} failed:`, lastError);
-      } catch (e: any) {
-        lastError = e.message;
-        console.log(`Model ${model} threw error:`, e.message);
-      }
+    if (!geminiRes.ok || !geminiRes.body) {
+      const err = await geminiRes.json();
+      return new Response(JSON.stringify({ error: err?.error?.message || 'Gemini API error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    return NextResponse.json(
-      { error: `AI unavailable: ${lastError}` },
-      { status: 500 }
-    );
+    // Stream the text chunks back to the client
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = geminiRes.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data:')) continue;
+            const jsonStr = trimmed.slice(5).trim();
+            if (!jsonStr || jsonStr === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (text) {
+                controller.enqueue(new TextEncoder().encode(text));
+              }
+            } catch {
+              // skip malformed chunks
+            }
+          }
+        }
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no',
+      },
+    });
   } catch (error: any) {
     console.error('Chat API error:', error);
-    return NextResponse.json(
-      { error: 'Failed to get AI response. Please try again.' },
-      { status: 500 }
-    );
+    return new Response(JSON.stringify({ error: 'Failed to get AI response. Please try again.' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }

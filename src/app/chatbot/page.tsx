@@ -1,43 +1,77 @@
 'use client';
 
 import * as React from 'react';
-import { Send, User, Bot, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Send, User, Bot, AlertTriangle, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { toast } from 'sonner';
 
 type Message = {
   role: 'user' | 'assistant';
   content: string;
 };
 
+const INITIAL_MESSAGE: Message = {
+  role: 'assistant',
+  content: "Hello! I'm your AI Health Assistant powered by Google Gemini. Ask me anything about health, wellness, nutrition, fitness, or general medical information. How can I help you today?",
+};
+
+const STORAGE_KEY = 'medicore_chat_history';
+
 export default function ChatbotPage() {
-  const [messages, setMessages] = React.useState<Message[]>([
-    { role: 'assistant', content: 'Hello! I\'m your AI Health Assistant powered by Google Gemini. Ask me anything about health, wellness, nutrition, fitness, or general medical information. How can I help you today?' }
-  ]);
+  const [messages, setMessages] = React.useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = React.useState('');
-  const [isTyping, setIsTyping] = React.useState(false);
+  const [isStreaming, setIsStreaming] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
+  // Load chat history from localStorage on mount
   React.useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: 'smooth' });
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Message[];
+        if (parsed.length > 0) setMessages(parsed);
+      }
+    } catch {
+      // ignore parse errors
     }
-  }, [messages, isTyping]);
+  }, []);
+
+  // Save chat history to localStorage whenever messages change
+  React.useEffect(() => {
+    if (messages.length > 1) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }, [messages]);
+
+  // Auto-scroll to bottom on new messages
+  React.useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isStreaming]);
 
   const handleSend = async (e: React.FormEvent, overrideInput?: string) => {
     e.preventDefault();
-    const messageText = overrideInput ?? input.trim();
-    if (!messageText) return;
+    const messageText = (overrideInput ?? input).trim();
+    if (!messageText || isStreaming) return;
 
     const newMessages: Message[] = [...messages, { role: 'user', content: messageText }];
     setMessages(newMessages);
     setInput('');
-    setIsTyping(true);
+    setIsStreaming(true);
     setError(null);
+
+    // Add empty assistant message that we'll stream into
+    const assistantIndex = newMessages.length;
+    setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
     try {
       const res = await fetch('/api/chat', {
@@ -46,18 +80,44 @@ export default function ChatbotPage() {
         body: JSON.stringify({ messages: newMessages }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Failed to get response.');
+      if (!res.ok || !res.body) {
+        const errData = await res.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error(errData.error || 'Request failed');
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
+      // Stream the response into the last message
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        fullText += chunk;
+
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[assistantIndex] = { role: 'assistant', content: fullText };
+          return updated;
+        });
+      }
+
+      if (!fullText) throw new Error('Empty response from AI.');
     } catch (err: any) {
+      // Remove the empty assistant message on error
+      setMessages(prev => prev.slice(0, assistantIndex));
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
-      setIsTyping(false);
+      setIsStreaming(false);
+      inputRef.current?.focus();
     }
+  };
+
+  const clearHistory = () => {
+    setMessages([INITIAL_MESSAGE]);
+    localStorage.removeItem(STORAGE_KEY);
+    toast.success('Chat history cleared.');
   };
 
   const quickQuestions = [
@@ -71,11 +131,24 @@ export default function ChatbotPage() {
     <div className='container mx-auto px-4 max-w-4xl py-8 flex flex-col h-[calc(100vh-4rem)]'>
 
       {/* Header */}
-      <div className='mb-6'>
-        <h1 className='text-3xl font-bold tracking-tight mb-2'>AI Health Assistant</h1>
-        <p className='text-muted-foreground text-lg'>
-          Powered by Google Gemini — get helpful answers to your health and wellness questions.
-        </p>
+      <div className='mb-6 flex items-start justify-between'>
+        <div>
+          <h1 className='text-3xl font-bold tracking-tight mb-2'>AI Health Assistant</h1>
+          <p className='text-muted-foreground text-lg'>
+            Powered by Google Gemini — your personal health companion.
+          </p>
+        </div>
+        {messages.length > 1 && (
+          <Button
+            variant='ghost'
+            size='sm'
+            className='text-muted-foreground hover:text-destructive mt-1'
+            onClick={clearHistory}
+          >
+            <Trash2 className='h-4 w-4 mr-1' />
+            Clear chat
+          </Button>
+        )}
       </div>
 
       {/* Chat Card */}
@@ -83,14 +156,14 @@ export default function ChatbotPage() {
         <div className='bg-secondary/30 p-3 text-xs text-muted-foreground flex items-center justify-center gap-2 border-b'>
           <AlertTriangle className='h-4 w-4 text-amber-500 shrink-0' />
           <span>
-            <strong className='font-semibold'>Medical Disclaimer:</strong> This assistant provides general wellness information only and is not a substitute for professional medical advice.
+            <strong className='font-semibold'>Medical Disclaimer:</strong> General wellness info only — not a substitute for professional medical advice.
           </span>
         </div>
 
         <ScrollArea className='flex-1 p-4'>
           <div className='space-y-6 pb-4'>
             {messages.map((msg, i) => (
-              <div key={i} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'assistant' && (
                   <Avatar className='h-8 w-8 mt-1 border bg-primary/10 shrink-0'>
                     <AvatarFallback className='bg-transparent text-primary'><Bot className='h-4 w-4' /></AvatarFallback>
@@ -102,7 +175,16 @@ export default function ChatbotPage() {
                     ? 'bg-primary text-primary-foreground rounded-tr-sm'
                     : 'bg-muted rounded-tl-sm'
                 }`}>
-                  <p className='text-sm leading-relaxed whitespace-pre-wrap'>{msg.content}</p>
+                  {msg.content ? (
+                    <p className='text-sm leading-relaxed whitespace-pre-wrap'>{msg.content}</p>
+                  ) : (
+                    // Streaming typing dots for empty assistant message
+                    <div className='flex items-center gap-1.5 py-1'>
+                      <div className='h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce' style={{ animationDelay: '0ms' }} />
+                      <div className='h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce' style={{ animationDelay: '150ms' }} />
+                      <div className='h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce' style={{ animationDelay: '300ms' }} />
+                    </div>
+                  )}
                 </div>
 
                 {msg.role === 'user' && (
@@ -112,19 +194,6 @@ export default function ChatbotPage() {
                 )}
               </div>
             ))}
-
-            {isTyping && (
-              <div className='flex gap-4 justify-start'>
-                <Avatar className='h-8 w-8 mt-1 border bg-primary/10 shrink-0'>
-                  <AvatarFallback className='bg-transparent text-primary'><Bot className='h-4 w-4' /></AvatarFallback>
-                </Avatar>
-                <div className='rounded-2xl px-4 py-3 bg-muted rounded-tl-sm flex items-center gap-1.5'>
-                  <div className='h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce' style={{ animationDelay: '0ms' }} />
-                  <div className='h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce' style={{ animationDelay: '150ms' }} />
-                  <div className='h-2 w-2 bg-muted-foreground/50 rounded-full animate-bounce' style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
-            )}
 
             {error && (
               <div className='flex justify-center'>
@@ -150,7 +219,7 @@ export default function ChatbotPage() {
                   size='sm'
                   className='rounded-full text-xs text-muted-foreground hover:text-primary'
                   onClick={(e) => handleSend(e as any, q)}
-                  disabled={isTyping}
+                  disabled={isStreaming}
                 >
                   {q}
                 </Button>
@@ -160,19 +229,20 @@ export default function ChatbotPage() {
 
           <form onSubmit={handleSend} className='flex gap-2 relative'>
             <Input
+              ref={inputRef}
               placeholder='Ask your health question...'
               value={input}
               onChange={(e) => setInput(e.target.value)}
               className='pr-12 py-6 rounded-full bg-secondary/50 border-border/50 focus-visible:ring-1'
-              disabled={isTyping}
+              disabled={isStreaming}
             />
             <Button
               type='submit'
               size='icon'
               className='absolute right-1.5 top-1.5 h-9 w-9 rounded-full'
-              disabled={!input.trim() || isTyping}
+              disabled={!input.trim() || isStreaming}
             >
-              {isTyping ? <RefreshCw className='h-4 w-4 animate-spin' /> : <Send className='h-4 w-4' />}
+              <Send className='h-4 w-4' />
               <span className='sr-only'>Send</span>
             </Button>
           </form>
