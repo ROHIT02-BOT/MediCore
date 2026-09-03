@@ -109,18 +109,14 @@ export function Navbar() {
                     </div>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href='/profile' className='cursor-pointer'>
-                      <Settings className='mr-2 h-4 w-4' />
-                      <span>Profile Settings</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href='/emergency' className='cursor-pointer'>
-                      <User className='mr-2 h-4 w-4' />
-                      <span>Emergency Information</span>
-                    </Link>
-                  </DropdownMenuItem>
+                  <Link href='/profile' className='flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground'>
+                    <Settings className='mr-2 h-4 w-4' />
+                    <span>Profile Settings</span>
+                  </Link>
+                  <Link href='/emergency' className='flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground'>
+                    <User className='mr-2 h-4 w-4' />
+                    <span>Emergency Information</span>
+                  </Link>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className='cursor-pointer text-destructive focus:text-destructive'>
                     <LogOut className='mr-2 h-4 w-4' />
