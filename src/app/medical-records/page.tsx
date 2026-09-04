@@ -100,21 +100,36 @@ export default function MedicalRecordsPage() {
   const handleView = async (fileUrlOrPath: string) => {
     try {
       let path = fileUrlOrPath;
-      // Extract path if it was previously saved as a full public URL
-      if (path.includes('/public/medical-records/')) {
-        path = path.split('/public/medical-records/')[1];
-      }
+      if (path.includes('/public/medical-records/')) path = path.split('/public/medical-records/')[1];
 
-      // Generate a signed URL valid for 60 seconds (works for private buckets)
-      const { data, error } = await supabase.storage
-        .from('medical-records')
-        .createSignedUrl(path, 60);
-
+      const { data, error } = await supabase.storage.from('medical-records').createSignedUrl(path, 60);
       if (error || !data) throw error || new Error('Could not generate URL');
       
       window.open(data.signedUrl, '_blank');
     } catch (err: any) {
       toast.error('Failed to open file: ' + err.message);
+    }
+  };
+
+  const handleDownload = async (fileUrlOrPath: string, fileName: string) => {
+    try {
+      let path = fileUrlOrPath;
+      if (path.includes('/public/medical-records/')) path = path.split('/public/medical-records/')[1];
+
+      const { data, error } = await supabase.storage
+        .from('medical-records')
+        .createSignedUrl(path, 60, { download: fileName });
+
+      if (error || !data) throw error || new Error('Could not generate URL');
+      
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      toast.error('Failed to download file: ' + err.message);
     }
   };
 
@@ -313,9 +328,14 @@ export default function MedicalRecordsPage() {
                 </div>
                 <div className="flex items-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                   {record.file_url && (
-                    <Button variant="outline" size="sm" onClick={() => handleView(record.file_url)}>
-                      <Download className="h-4 w-4 mr-2" /> View
-                    </Button>
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => handleView(record.file_url)}>
+                        <FileIcon className="h-4 w-4 mr-2" /> View
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDownload(record.file_url, record.file_name)}>
+                        <Download className="h-4 w-4 mr-2" /> Download
+                      </Button>
+                    </>
                   )}
                   <Button variant="ghost" size="icon" onClick={() => handleDelete(record.id, record.file_url)} className="text-muted-foreground hover:text-destructive">
                     <Trash2 className="h-4 w-4" />
