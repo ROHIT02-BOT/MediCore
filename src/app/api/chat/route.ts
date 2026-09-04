@@ -81,11 +81,8 @@ BEHAVIOR AND TONE RULES
 
 // Fallback order — tries each model until one responds successfully
 const MODELS = [
-  'gemini-3.6-flash',
-  'gemini-3.5-flash',
-  'gemini-flash-latest',
-  'gemini-3.7-flash',
-  'gemini-3.8-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-8b',
 ];
 
 async function tryStreamWithModel(apiKey: string, model: string, contents: any[]): Promise<Response | null> {
@@ -100,7 +97,7 @@ async function tryStreamWithModel(apiKey: string, model: string, contents: any[]
     }),
   });
 
-  // 429 = rate limit, 503 = overloaded → try next model
+  // 429 = rate limit, 503 = overloaded -> try next model
   if (geminiRes.status === 429 || geminiRes.status === 503) {
     console.log(`Model ${model} unavailable (${geminiRes.status}), trying next...`);
     return null;
@@ -163,7 +160,7 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
-      return new Response(JSON.stringify({ error: 'Gemini API key not configured.' }), {
+      return new Response(JSON.stringify({ error: 'Gemini API key not configured on server.' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -196,7 +193,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Chat API error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to get AI response. Please try again.' }), {
+    return new Response(JSON.stringify({ error: 'Failed to process AI response on the server. Please try again.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

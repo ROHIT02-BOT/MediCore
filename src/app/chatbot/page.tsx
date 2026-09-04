@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { supabase } from '@/lib/supabase';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -20,48 +21,79 @@ const INITIAL_MESSAGE: Message = {
   content: "Hello! I'm **MediCore AI** — your comprehensive Health Information Assistant powered by Google Gemini.\n\nI can help you with:\n- 🤒 Symptoms & diseases\n- 💊 Medicines & side effects\n- 🧪 Lab reports & test results\n- 🧠 Mental health & wellness\n- 🥗 Nutrition, diet & fitness\n- 🚑 First aid & emergency guidance\n- And much more!\n\nHow can I help you today?",
 };
 
-const STORAGE_KEY = 'medicore_chat_history';
-
 export default function ChatbotPage() {
   const [messages, setMessages] = React.useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = React.useState('');
   const [isStreaming, setIsStreaming] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [userId, setUserId] = React.useState<string | null>(null);
   const bottomRef = React.useRef<HTMLDivElement>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  // Load chat history from localStorage on mount
   React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as Message[];
-        if (parsed.length > 0) setMessages(parsed);
+    const loadHistory = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        setUserId(user.id);
+        
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .select('role, message')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true });
+          
+        if (data && data.length > 0) {
+          setMessages([
+            INITIAL_MESSAGE,
+            ...data.map((d: any) => ({ role: d.role, content: d.message }))
+          ]);
+        }
+      } catch (err) {
+        console.error('Failed to load chat history:', err);
       }
-    } catch { /* ignore */ }
+    };
+    loadHistory();
   }, []);
 
-  // Save to localStorage on change
-  React.useEffect(() => {
-    if (messages.length > 1) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-      } catch { /* ignore */ }
+  const saveMessageToDB = async (role: string, content: string, uid: string) => {
+    try {
+      await supabase.from('chat_messages').insert({ user_id: uid, role, message: content });
+    } catch (err) {
+      console.error('Failed to save message:', err);
     }
-  }, [messages]);
+  };
 
   // Auto-scroll to bottom
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const fetchWithRetry = async (url: string, options: any, maxRetries = 3) => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const res = await fetch(url, options);
+        if (res.status === 429 || res.status >= 500) {
+          throw new Error(`Server error ${res.status}`); // Will trigger retry
+        }
+        return res;
+      } catch (err: any) {
+        if (i === maxRetries - 1) throw err;
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000)); // Exponential backoff: 1s, 2s, 4s...
+      }
+    }
+    throw new Error('Max retries reached');
+  };
+
   const handleSend = async (e: React.FormEvent, overrideInput?: string) => {
     e.preventDefault();
-    const messageText = (overrideInput ?? input).trim();
-    if (!messageText || isStreaming) return;
+    if (isStreaming) return;
+    
+    const userText = overrideInput || input;
+    if (!userText.trim()) return;
 
-    const newMessages: Message[] = [...messages, { role: 'user', content: messageText }];
+    const newMessages = [...messages, { role: 'user' as const, content: userText.trim() }];
     setMessages(newMessages);
     setInput('');
     setIsStreaming(true);
@@ -70,8 +102,12 @@ export default function ChatbotPage() {
     const assistantIndex = newMessages.length;
     setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
+    if (userId) {
+      saveMessageToDB('user', userText.trim(), userId);
+    }
+
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetchWithRetry('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: newMessages }),
@@ -98,19 +134,32 @@ export default function ChatbotPage() {
       }
 
       if (!fullText) throw new Error('Empty response from AI.');
+      
+      if (userId) {
+        saveMessageToDB('assistant', fullText, userId);
+      }
     } catch (err: any) {
-      setMessages(prev => prev.slice(0, assistantIndex));
-      setError(err.message || 'Something went wrong. Please try again.');
+      console.error('Chat error:', err);
+      // Revert the message state and restore input
+      setMessages(prev => prev.slice(0, assistantIndex - 1));
+      setInput(userText);
+      setError("I'm having trouble connecting right now. Please try again in a moment.");
     } finally {
       setIsStreaming(false);
       inputRef.current?.focus();
     }
   };
 
-  const clearHistory = () => {
+  const clearHistory = async () => {
     setMessages([INITIAL_MESSAGE]);
-    localStorage.removeItem(STORAGE_KEY);
     toast.success('Chat history cleared.');
+    if (userId) {
+      try {
+        await supabase.from('chat_messages').delete().eq('user_id', userId);
+      } catch (err) {
+        console.error('Failed to clear db history');
+      }
+    }
   };
 
   const quickQuestions = [
