@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function DashboardPage() {
   const [userName, setUserName] = React.useState('User');
+  const [userId, setUserId] = React.useState<string | null>(null);
   const [stats, setStats] = React.useState({
     records: 0,
     reminders: 0,
@@ -18,19 +19,60 @@ export default function DashboardPage() {
     activity: 0
   });
 
+  const [upcomingReminders, setUpcomingReminders] = React.useState<any[]>([]);
+  const [recentRecords, setRecentRecords] = React.useState<any[]>([]);
+
   React.useEffect(() => {
     const loadData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserName(user.user_metadata?.full_name?.split(' ')[0] || 'User');
-        // In a real app, fetch these from Supabase tables
-        // For now, we mock the stats display structure
-        setStats({
-          records: 0,
-          reminders: 0,
-          contacts: 0,
-          activity: 0
-        });
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setUserId(user.id);
+          
+          // Get profile name if exists, else fallback to metadata or 'User'
+          const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+          setUserName(profile?.full_name?.split(' ')[0] || user.user_metadata?.full_name?.split(' ')[0] || 'User');
+          
+          // Fetch stats
+          const [resRecords, resReminders, resContacts] = await Promise.all([
+            supabase.from('medical_records').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+            supabase.from('medicine_reminders').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_active', true),
+            supabase.from('emergency_contacts').select('*', { count: 'exact', head: true }).eq('user_id', user.id)
+          ]);
+
+          const recordsCount = resRecords.count || 0;
+          const remindersCount = resReminders.count || 0;
+          const contactsCount = resContacts.count || 0;
+          
+          // Fetch upcoming reminders (active ones)
+          const { data: reminders } = await supabase
+            .from('medicine_reminders')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .limit(3);
+            
+          if (reminders) setUpcomingReminders(reminders);
+
+          // Fetch recent records
+          const { data: records } = await supabase
+            .from('medical_records')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(3);
+            
+          if (records) setRecentRecords(records);
+
+          setStats({
+            records: recordsCount,
+            reminders: remindersCount,
+            contacts: contactsCount,
+            activity: recordsCount + remindersCount
+          });
+        }
+      } catch (err) {
+        console.error(err);
       }
     };
     loadData();
@@ -114,13 +156,34 @@ export default function DashboardPage() {
         <section>
           <h2 className='text-lg font-semibold mb-4 text-foreground/80 tracking-tight'>TODAY / UPCOMING</h2>
           <Card className='border-border/50 shadow-sm min-h-[250px] flex flex-col'>
-            <CardContent className='flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground'>
-              <Bell className='h-10 w-10 mb-4 opacity-20' />
-              <p className='mb-4'>No upcoming medications or events for today.</p>
-              <Link href='/reminders' className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                <Plus className='mr-2 h-4 w-4' /> Add Reminder
-              </Link>
-            </CardContent>
+            {upcomingReminders.length === 0 ? (
+              <CardContent className='flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground'>
+                <Bell className='h-10 w-10 mb-4 opacity-20' />
+                <p className='mb-4'>No upcoming medications or events for today.</p>
+                <Link href='/reminders' className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                  <Plus className='mr-2 h-4 w-4' /> Add Reminder
+                </Link>
+              </CardContent>
+            ) : (
+              <CardContent className='flex-1 p-0 flex flex-col'>
+                {upcomingReminders.map((reminder) => (
+                  <div key={reminder.id} className='flex items-center justify-between p-4 border-b last:border-0'>
+                    <div>
+                      <h4 className='font-semibold'>{reminder.medicine_name}</h4>
+                      <p className='text-sm text-muted-foreground'>{reminder.dosage} - {reminder.frequency}</p>
+                    </div>
+                    <div className='text-sm font-medium bg-amber-500/10 text-amber-600 px-2 py-1 rounded'>
+                      {reminder.reminder_times[0] || 'Set time'}
+                    </div>
+                  </div>
+                ))}
+                <div className='p-4 mt-auto text-center border-t'>
+                  <Link href='/reminders' className='text-sm font-medium text-primary hover:underline'>
+                    View All Reminders
+                  </Link>
+                </div>
+              </CardContent>
+            )}
           </Card>
         </section>
 
@@ -128,19 +191,40 @@ export default function DashboardPage() {
         <section>
           <h2 className='text-lg font-semibold mb-4 text-foreground/80 tracking-tight'>RECENT ACTIVITY</h2>
           <Card className='border-border/50 shadow-sm min-h-[250px] flex flex-col'>
-            <CardContent className='flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground'>
-              <Activity className='h-10 w-10 mb-4 opacity-20' />
-              <h3 className='font-medium text-foreground mb-1'>No activity yet</h3>
-              <p className='mb-4 text-sm'>Your recent health activity will appear here.</p>
-              <div className='flex gap-2 w-full sm:w-auto'>
-                <Link href='/medical-records' className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                  View Records
-                </Link>
-                <Link href='/reminders' className={buttonVariants({ variant: 'default', size: 'sm' })}>
-                  <Plus className='h-4 w-4 mr-1' /> Add Reminder
-                </Link>
-              </div>
-            </CardContent>
+            {recentRecords.length === 0 ? (
+              <CardContent className='flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground'>
+                <Activity className='h-10 w-10 mb-4 opacity-20' />
+                <h3 className='font-medium text-foreground mb-1'>No activity yet</h3>
+                <p className='mb-4 text-sm'>Your recent health activity will appear here.</p>
+                <div className='flex gap-2 w-full sm:w-auto'>
+                  <Link href='/medical-records' className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                    View Records
+                  </Link>
+                  <Link href='/reminders' className={buttonVariants({ variant: 'default', size: 'sm' })}>
+                    <Plus className='h-4 w-4 mr-1' /> Add Reminder
+                  </Link>
+                </div>
+              </CardContent>
+            ) : (
+              <CardContent className='flex-1 p-0 flex flex-col'>
+                {recentRecords.map((record) => (
+                  <div key={record.id} className='flex items-center gap-4 p-4 border-b last:border-0'>
+                    <div className='h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500'>
+                      <FileText className='h-5 w-5' />
+                    </div>
+                    <div>
+                      <h4 className='font-semibold'>{record.title}</h4>
+                      <p className='text-xs text-muted-foreground'>Uploaded on {record.record_date}</p>
+                    </div>
+                  </div>
+                ))}
+                <div className='p-4 mt-auto text-center border-t'>
+                  <Link href='/medical-records' className='text-sm font-medium text-primary hover:underline'>
+                    View All Records
+                  </Link>
+                </div>
+              </CardContent>
+            )}
           </Card>
         </section>
       </div>

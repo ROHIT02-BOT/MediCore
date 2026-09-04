@@ -2,19 +2,74 @@
 'use client';
 
 import * as React from 'react';
-import { Activity, Droplets, HeartPulse, Moon, Utensils, Brain } from 'lucide-react';
+import { Activity, Droplets, HeartPulse, Moon, Utensils, Brain, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 export default function HealthToolsPage() {
+  const [userId, setUserId] = React.useState<string | null>(null);
+  
   const [bmiHeight, setBmiHeight] = React.useState('');
   const [bmiWeight, setBmiWeight] = React.useState('');
   const [bmiResult, setBmiResult] = React.useState<{ bmi: string, category: string, desc: string } | null>(null);
   
   const [waterGoal, setWaterGoal] = React.useState(8);
   const [waterConsumed, setWaterConsumed] = React.useState(0);
+  const [isLoadingWater, setIsLoadingWater] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadWater = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setIsLoadingWater(false);
+          return;
+        }
+        setUserId(user.id);
+
+        const today = new Date().toISOString().split('T')[0];
+        const { data, error } = await supabase
+          .from('health_tracking')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('tracking_date', today)
+          .single();
+
+        if (data) {
+          setWaterConsumed(data.water_consumed);
+          if (data.water_goal) setWaterGoal(data.water_goal);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoadingWater(false);
+      }
+    };
+    loadWater();
+  }, []);
+
+  const updateWater = async (newAmount: number) => {
+    const safeAmount = Math.max(0, newAmount);
+    setWaterConsumed(safeAmount);
+    if (!userId) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await supabase.from('health_tracking').upsert({
+        user_id: userId,
+        tracking_date: today,
+        water_goal: waterGoal,
+        water_consumed: safeAmount,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,tracking_date' });
+    } catch (err) {
+      toast.error('Failed to save water tracker progress.');
+    }
+  };
 
   const calculateBMI = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,13 +158,13 @@ export default function HealthToolsPage() {
             </div>
             
             <div className='flex gap-2 w-full'>
-              <Button variant='outline' className='flex-1' onClick={() => setWaterConsumed(Math.max(0, waterConsumed - 1))}>-1</Button>
-              <Button className='flex-1 bg-blue-500 hover:bg-blue-600' onClick={() => setWaterConsumed(waterConsumed + 1)}>+1 Glass</Button>
-              <Button className='flex-1 bg-blue-500 hover:bg-blue-600' onClick={() => setWaterConsumed(waterConsumed + 2)}>+2 Glasses</Button>
+              <Button variant='outline' className='flex-1' onClick={() => updateWater(waterConsumed - 1)} disabled={isLoadingWater}>-1</Button>
+              <Button className='flex-1 bg-blue-500 hover:bg-blue-600' onClick={() => updateWater(waterConsumed + 1)} disabled={isLoadingWater}>+1 Glass</Button>
+              <Button className='flex-1 bg-blue-500 hover:bg-blue-600' onClick={() => updateWater(waterConsumed + 2)} disabled={isLoadingWater}>+2 Glasses</Button>
             </div>
           </CardContent>
           <CardFooter className='justify-center border-t pt-4'>
-            <Button variant='ghost' size='sm' onClick={() => setWaterConsumed(0)}>Reset Progress</Button>
+            <Button variant='ghost' size='sm' onClick={() => updateWater(0)} disabled={isLoadingWater}>Reset Progress</Button>
           </CardFooter>
         </Card>
       </div>
