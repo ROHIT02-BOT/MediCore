@@ -71,10 +71,7 @@ export default function MedicalRecordsPage() {
 
       if (uploadError) throw uploadError;
 
-      const { data: publicUrlData } = supabase.storage
-        .from('medical-records')
-        .getPublicUrl(filePath);
-
+      // Save the filePath instead of publicUrl to support private buckets securely
       const { data: record, error: dbError } = await supabase.from('medical_records').insert({
         user_id: userId,
         title: formData.get('title'),
@@ -82,7 +79,7 @@ export default function MedicalRecordsPage() {
         doctor: formData.get('doctor') || null,
         hospital: formData.get('hospital') || null,
         record_date: formData.get('date'),
-        file_url: publicUrlData.publicUrl,
+        file_url: filePath,
         file_name: file.name,
         file_size: file.size
       }).select().single();
@@ -100,7 +97,28 @@ export default function MedicalRecordsPage() {
     }
   };
 
-  const handleDelete = async (id: string, file_name_url: string) => {
+  const handleView = async (fileUrlOrPath: string) => {
+    try {
+      let path = fileUrlOrPath;
+      // Extract path if it was previously saved as a full public URL
+      if (path.includes('/public/medical-records/')) {
+        path = path.split('/public/medical-records/')[1];
+      }
+
+      // Generate a signed URL valid for 60 seconds (works for private buckets)
+      const { data, error } = await supabase.storage
+        .from('medical-records')
+        .createSignedUrl(path, 60);
+
+      if (error || !data) throw error || new Error('Could not generate URL');
+      
+      window.open(data.signedUrl, '_blank');
+    } catch (err: any) {
+      toast.error('Failed to open file: ' + err.message);
+    }
+  };
+
+  const handleDelete = async (id: string, fileUrlOrPath: string) => {
     if (confirm('Delete this medical record?\\nThis action cannot be undone.')) {
       try {
         await supabase.from('medical_records').delete().eq('id', id);
@@ -295,9 +313,9 @@ export default function MedicalRecordsPage() {
                 </div>
                 <div className="flex items-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                   {record.file_url && (
-                    <a href={record.file_url} target="_blank" rel="noopener noreferrer" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                    <Button variant="outline" size="sm" onClick={() => handleView(record.file_url)}>
                       <Download className="h-4 w-4 mr-2" /> View
-                    </a>
+                    </Button>
                   )}
                   <Button variant="ghost" size="icon" onClick={() => handleDelete(record.id, record.file_url)} className="text-muted-foreground hover:text-destructive">
                     <Trash2 className="h-4 w-4" />
