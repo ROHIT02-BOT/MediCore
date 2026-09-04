@@ -80,7 +80,7 @@ export default function ProfilePage() {
         .from('profiles')
         .upsert({
           id: userId,
-          email: userEmail,
+          email: email,
           full_name: fullName,
           phone: phone,
           date_of_birth: dob || null,
