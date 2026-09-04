@@ -81,8 +81,9 @@ BEHAVIOR AND TONE RULES
 
 // Fallback order — tries each model until one responds successfully
 const MODELS = [
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-8b',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-flash-latest',
 ];
 
 async function tryStreamWithModel(apiKey: string, model: string, contents: any[]): Promise<Response | null> {
