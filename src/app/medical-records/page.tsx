@@ -8,7 +8,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
@@ -177,12 +177,10 @@ export default function MedicalRecordsPage() {
           </p>
         </div>
         <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-          <DialogTrigger>
-            <Button size='lg'>
-              <UploadCloud className='mr-2 h-5 w-5' />
-              Upload Record
-            </Button>
-          </DialogTrigger>
+          <Button size='lg' onClick={() => setIsUploadOpen(true)}>
+            <UploadCloud className='mr-2 h-5 w-5' />
+            Upload Record
+          </Button>
           <DialogContent className='sm:max-w-[500px]'>
             <form onSubmit={handleUpload}>
               <DialogHeader>
