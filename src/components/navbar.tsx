@@ -3,17 +3,10 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Shield, Menu, X, Moon, Sun, LogOut, Settings, User } from 'lucide-react';
+import { Shield, Menu, Moon, Sun, LogOut, Settings, User } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { supabase } from '@/lib/supabase';
 import { Button, buttonVariants } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { toast } from 'sonner';
@@ -24,6 +17,10 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
+
+  // Native profile dropdown — no Base UI Menu so it never interferes with page scroll
+  const [isProfileOpen, setIsProfileOpen] = React.useState(false);
+  const profileRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -37,7 +34,30 @@ export function Navbar() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Close dropdown on click-outside
+  React.useEffect(() => {
+    if (!isProfileOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isProfileOpen]);
+
+  // Close dropdown on Escape
+  React.useEffect(() => {
+    if (!isProfileOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsProfileOpen(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isProfileOpen]);
+
   const handleLogout = async () => {
+    setIsProfileOpen(false);
     await supabase.auth.signOut();
     toast.success('Signed out successfully.');
     router.push('/');
@@ -90,16 +110,25 @@ export function Navbar() {
           </Button>
 
           {user ? (
-            <div className='hidden md:block'>
-              <DropdownMenu>
-                <DropdownMenuTrigger className="relative h-8 w-8 rounded-full inline-flex items-center justify-center hover:bg-accent transition-colors">
-  <Avatar className="h-8 w-8">
-    <AvatarFallback className="bg-primary/10 text-primary">
-      {user.email?.charAt(0).toUpperCase()}
-    </AvatarFallback>
-  </Avatar>
-</DropdownMenuTrigger>
-                <DropdownMenuContent className='w-56' align='end'>
+            /* ── Native profile dropdown (no Base UI Menu) ── */
+            <div className='hidden md:block relative' ref={profileRef}>
+              <button
+                type='button'
+                onClick={() => setIsProfileOpen((v) => !v)}
+                aria-haspopup='true'
+                aria-expanded={isProfileOpen}
+                className='relative h-8 w-8 rounded-full inline-flex items-center justify-center hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2'
+              >
+                <Avatar className='h-8 w-8'>
+                  <AvatarFallback className='bg-primary/10 text-primary'>
+                    {user.email?.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+
+              {isProfileOpen && (
+                <div className='absolute right-0 top-full mt-1 w-56 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 z-50 p-1 animate-in fade-in-0 zoom-in-95'>
+                  {/* User info */}
                   <div className='flex items-center justify-start gap-2 p-2'>
                     <div className='flex flex-col space-y-1 leading-none'>
                       <p className='font-medium'>{user.user_metadata?.full_name || 'User'}</p>
@@ -108,22 +137,34 @@ export function Navbar() {
                       </p>
                     </div>
                   </div>
-                  <DropdownMenuSeparator />
-                  <Link href='/profile' className='flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground'>
+                  <div className='-mx-1 my-1 h-px bg-border' />
+                  <Link
+                    href='/profile'
+                    onClick={() => setIsProfileOpen(false)}
+                    className='flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground'
+                  >
                     <Settings className='mr-2 h-4 w-4' />
                     <span>Profile Settings</span>
                   </Link>
-                  <Link href='/emergency' className='flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground'>
+                  <Link
+                    href='/emergency'
+                    onClick={() => setIsProfileOpen(false)}
+                    className='flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground'
+                  >
                     <User className='mr-2 h-4 w-4' />
                     <span>Emergency Information</span>
                   </Link>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className='cursor-pointer text-destructive focus:text-destructive'>
+                  <div className='-mx-1 my-1 h-px bg-border' />
+                  <button
+                    type='button'
+                    onClick={handleLogout}
+                    className='w-full flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground text-destructive focus:text-destructive'
+                  >
                     <LogOut className='mr-2 h-4 w-4' />
                     <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className='hidden md:flex gap-2'>
