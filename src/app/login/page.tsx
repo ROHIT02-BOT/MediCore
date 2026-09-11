@@ -16,19 +16,22 @@ export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
-  
+  const [showResetForm, setShowResetForm] = React.useState(false);
+  const [resetEmail, setResetEmail] = React.useState('');
+  const [isResetting, setIsResetting] = React.useState(false);
+
   const handleEmailLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     const formData = new FormData(e.currentTarget);
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    
+
     setIsLoading(false);
-    
+
     if (error) {
       toast.error(error.message);
     } else {
@@ -48,11 +51,74 @@ export default function LoginPage() {
         },
       },
     });
-    
+
     if (error) {
       toast.error(error.message);
     }
   };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) { toast.error('Please enter your email address.'); return; }
+    setIsResetting(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+    });
+    setIsResetting(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('Password reset email sent! Check your inbox.');
+      setShowResetForm(false);
+    }
+  };
+
+  if (showResetForm) {
+    return (
+      <div className='flex min-h-[calc(100vh-4rem)] items-center justify-center p-4 py-12'>
+        <Card className='w-full max-w-md shadow-lg border-border/50'>
+          <CardHeader className='space-y-2 text-center pb-6'>
+            <div className='mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10'>
+              <Shield className='h-6 w-6 text-primary' />
+            </div>
+            <CardTitle className='text-2xl font-bold tracking-tight'>Reset Password</CardTitle>
+            <CardDescription className='text-base'>
+              Enter your email and we'll send a reset link.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleForgotPassword} className='space-y-4'>
+              <div className='space-y-2'>
+                <Label htmlFor='resetEmail'>Email Address</Label>
+                <Input
+                  id='resetEmail'
+                  type='email'
+                  placeholder='you@example.com'
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  required
+                  disabled={isResetting}
+                />
+              </div>
+              <Button className='w-full h-11' type='submit' disabled={isResetting}>
+                {isResetting ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : null}
+                Send Reset Email
+              </Button>
+            </form>
+          </CardContent>
+          <CardFooter className='flex justify-center pt-2 pb-8'>
+            <button
+              type='button'
+              onClick={() => setShowResetForm(false)}
+              className='text-sm font-medium text-primary hover:underline'
+            >
+              Back to Sign In
+            </button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className='flex min-h-[calc(100vh-4rem)] items-center justify-center p-4 py-12'>
@@ -82,9 +148,13 @@ export default function LoginPage() {
             <div className='space-y-2'>
               <div className='flex items-center justify-between'>
                 <Label htmlFor='password'>Password</Label>
-                <Link href='#' className='text-sm font-medium text-primary hover:underline'>
+                <button
+                  type='button'
+                  onClick={() => setShowResetForm(true)}
+                  className='text-sm font-medium text-primary hover:underline'
+                >
                   Forgot password?
-                </Link>
+                </button>
               </div>
               <div className='relative'>
                 <Input
@@ -135,7 +205,7 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className='flex flex-col items-center justify-center space-y-4 pt-4 pb-8'>
           <div className='text-sm text-muted-foreground'>
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href='/register' className='font-medium text-primary hover:underline'>
               Create account
             </Link>
@@ -149,4 +219,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

@@ -135,9 +135,16 @@ export default function MedicalRecordsPage() {
   };
 
   const handleDelete = async (id: string, fileUrlOrPath: string) => {
-    if (confirm('Delete this medical record?\\nThis action cannot be undone.')) {
+    if (confirm('Delete this medical record?\nThis action cannot be undone.')) {
       try {
+        // Delete DB row first
         await supabase.from('medical_records').delete().eq('id', id);
+        // Also remove file from storage to avoid orphaned files
+        if (fileUrlOrPath) {
+          let path = fileUrlOrPath;
+          if (path.includes('/public/medical-records/')) path = path.split('/public/medical-records/')[1];
+          await supabase.storage.from('medical-records').remove([path]);
+        }
         setRecords(records.filter(r => r.id !== id));
         toast.success('Medical record deleted successfully.');
       } catch (err) {

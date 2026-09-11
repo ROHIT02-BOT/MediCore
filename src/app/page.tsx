@@ -84,7 +84,7 @@ export default function Home() {
             <span className='font-semibold text-lg'>SecureMed</span>
           </div>
           <p className='text-sm text-muted-foreground'>
-            © {new Date().getFullYear()} SecureMed. All rights reserved.
+            &copy; {new Date().getFullYear()} SecureMed. All rights reserved.
           </p>
         </div>
       </footer>

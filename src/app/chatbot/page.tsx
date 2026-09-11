@@ -18,7 +18,7 @@ type Message = {
 
 const INITIAL_MESSAGE: Message = {
   role: 'assistant',
-  content: "Hello! I'm **MediCore AI** — your comprehensive Health Information Assistant powered by Google Gemini.\n\nI can help you with:\n- 🤒 Symptoms & diseases\n- 💊 Medicines & side effects\n- 🧪 Lab reports & test results\n- 🧠 Mental health & wellness\n- 🥗 Nutrition, diet & fitness\n- 🚑 First aid & emergency guidance\n- And much more!\n\nHow can I help you today?",
+  content: "Hello! I'm **MediCore AI** \u2014 your comprehensive Health Information Assistant powered by Groq.\n\nI can help you with:\n- \uD83E\uDD12 Symptoms & diseases\n- \uD83D\uDC8A Medicines & side effects\n- \uD83E\uDDEA Lab reports & test results\n- \uD83E\uDDE0 Mental health & wellness\n- \uD83E\uDD57 Nutrition, diet & fitness\n- \uD83D\uDE91 First aid & emergency guidance\n- And much more!\n\nHow can I help you today?",
 };
 
 export default function ChatbotPage() {
@@ -177,7 +177,7 @@ export default function ChatbotPage() {
         <div>
           <h1 className='text-3xl font-bold tracking-tight mb-1'>AI Health Assistant</h1>
           <p className='text-muted-foreground'>
-            Powered by Google Gemini — your personal health companion.
+            Powered by Groq &mdash; your personal health companion.
           </p>
         </div>
         {messages.length > 1 && (
