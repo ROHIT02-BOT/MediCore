@@ -18,7 +18,7 @@ export function Navbar() {
   const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
 
-  // Native profile dropdown — no Base UI Menu so it never interferes with page scroll
+  // Native profile dropdown — no Base UI Portal, no scroll interference
   const [isProfileOpen, setIsProfileOpen] = React.useState(false);
   const profileRef = React.useRef<HTMLDivElement>(null);
 
@@ -27,14 +27,21 @@ export function Navbar() {
       setUser(session?.user ?? null);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Close dropdown on click-outside
+  // Close profile dropdown when route changes
+  React.useEffect(() => {
+    setIsProfileOpen(false);
+  }, [pathname]);
+
+  // Close on click-outside
   React.useEffect(() => {
     if (!isProfileOpen) return;
     const handler = (e: MouseEvent) => {
@@ -46,7 +53,7 @@ export function Navbar() {
     return () => document.removeEventListener('mousedown', handler);
   }, [isProfileOpen]);
 
-  // Close dropdown on Escape
+  // Close on Escape
   React.useEffect(() => {
     if (!isProfileOpen) return;
     const handler = (e: KeyboardEvent) => {
@@ -110,7 +117,7 @@ export function Navbar() {
           </Button>
 
           {user ? (
-            /* ── Native profile dropdown (no Base UI Menu) ── */
+            /* Native dropdown — rendered inline in the header (no Portal, no stacking isolation) */
             <div className='hidden md:block relative' ref={profileRef}>
               <button
                 type='button'
@@ -128,7 +135,6 @@ export function Navbar() {
 
               {isProfileOpen && (
                 <div className='absolute right-0 top-full mt-1 w-56 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 z-50 p-1 animate-in fade-in-0 zoom-in-95'>
-                  {/* User info */}
                   <div className='flex items-center justify-start gap-2 p-2'>
                     <div className='flex flex-col space-y-1 leading-none'>
                       <p className='font-medium'>{user.user_metadata?.full_name || 'User'}</p>
@@ -190,7 +196,7 @@ export function Navbar() {
                 <Shield className='h-6 w-6 text-primary' />
                 <span className='font-bold text-lg'>SecureMed</span>
               </Link>
-              
+
               <div className='flex flex-col gap-4'>
                 {user ? (
                   <>
@@ -211,23 +217,43 @@ export function Navbar() {
                       </Link>
                     ))}
                     <div className='my-2 border-t' />
-                    <Link href='/profile' onClick={() => setIsOpen(false)} className='text-base font-medium text-muted-foreground hover:text-primary'>
+                    <Link
+                      href='/profile'
+                      onClick={() => setIsOpen(false)}
+                      className='text-base font-medium text-muted-foreground hover:text-primary'
+                    >
                       Profile Settings
                     </Link>
-                    <Link href='/emergency' onClick={() => setIsOpen(false)} className='text-base font-medium text-muted-foreground hover:text-primary'>
+                    <Link
+                      href='/emergency'
+                      onClick={() => setIsOpen(false)}
+                      className='text-base font-medium text-muted-foreground hover:text-primary'
+                    >
                       Emergency Information
                     </Link>
-                    <Button variant='outline' className='mt-4 justify-start text-destructive' onClick={() => { handleLogout(); setIsOpen(false); }}>
+                    <Button
+                      variant='outline'
+                      className='mt-4 justify-start text-destructive'
+                      onClick={() => { handleLogout(); setIsOpen(false); }}
+                    >
                       <LogOut className='mr-2 h-4 w-4' />
                       Log out
                     </Button>
                   </>
                 ) : (
                   <div className='flex flex-col gap-4 mt-4'>
-                    <Link href='/login' onClick={() => setIsOpen(false)} className={buttonVariants({ variant: 'default' })}>
+                    <Link
+                      href='/login'
+                      onClick={() => setIsOpen(false)}
+                      className={buttonVariants({ variant: 'default' })}
+                    >
                       Login
                     </Link>
-                    <Link href='/register' onClick={() => setIsOpen(false)} className={buttonVariants({ variant: 'outline' })}>
+                    <Link
+                      href='/register'
+                      onClick={() => setIsOpen(false)}
+                      className={buttonVariants({ variant: 'outline' })}
+                    >
                       Create Account
                     </Link>
                   </div>

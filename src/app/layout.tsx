@@ -4,6 +4,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { Navbar } from '@/components/navbar';
+import { ScrollToTop } from '@/components/scroll-to-top';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -19,10 +20,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang='en' suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans h-screen overflow-hidden bg-background text-foreground antialiased flex flex-col`} suppressHydrationWarning>
+      <body className={`${inter.variable} font-sans min-h-screen bg-background text-foreground antialiased flex flex-col`} suppressHydrationWarning>
         <ThemeProvider attribute='class' defaultTheme='system' enableSystem disableTransitionOnChange>
+          <ScrollToTop />
           <Navbar />
-          <main className='flex-1 flex flex-col overflow-y-auto'>
+          <main className='flex-1 flex flex-col'>
             {children}
           </main>
           <Toaster position='top-right' />
