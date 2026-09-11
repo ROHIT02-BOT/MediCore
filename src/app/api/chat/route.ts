@@ -81,8 +81,8 @@ BEHAVIOR AND TONE RULES
 ❌ Never fabricate medical facts — acknowledge uncertainty when you are unsure.`;
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-// Primary: llama-3.3-70b-versatile — fast & capable. Fallback: llama3-8b-8192
-const MODELS = ['llama-3.3-70b-versatile', 'llama3-8b-8192'];
+// Use currently available Groq models
+const MODELS = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'];
 
 async function tryStreamWithModel(
   apiKey: string,
