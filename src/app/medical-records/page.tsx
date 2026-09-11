@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
+import LoadingScreen from '@/components/loading-screen';
 
 const categories = ['Prescription', 'Lab Report', 'Medical Report', 'Scan', 'Diagnosis', 'Insurance', 'Other'];
 
@@ -163,7 +164,7 @@ export default function MedicalRecordsPage() {
 
   const latestUpload = records.length > 0 ? format(new Date(records[0].created_at), 'MMM d, yyyy') : '-';
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading medical records...</div>;
+  if (isLoading) return <LoadingScreen />;
 
   return (
     <div className='container mx-auto px-4 max-w-5xl py-8 space-y-8'>

@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
+import LoadingScreen from '@/components/loading-screen';
 
 export default function RemindersPage() {
   const [userId, setUserId] = React.useState<string | null>(null);
@@ -90,7 +91,7 @@ export default function RemindersPage() {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading reminders...</div>;
+  if (isLoading) return <LoadingScreen />;
 
   const activeCount = reminders.filter(r => r.is_active).length;
 

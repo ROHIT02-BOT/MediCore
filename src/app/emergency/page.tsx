@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import LoadingScreen from '@/components/loading-screen';
 
 export default function EmergencyInfoPage() {
   const [isLoading, setIsLoading] = React.useState(true);
@@ -146,7 +147,7 @@ export default function EmergencyInfoPage() {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading emergency info...</div>;
+  if (isLoading) return <LoadingScreen />;
 
   return (
     <div className='container mx-auto px-4 max-w-4xl py-8 space-y-8'>

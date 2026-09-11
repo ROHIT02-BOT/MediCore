@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import LoadingScreen from '@/components/loading-screen';
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = React.useState(false);
@@ -122,7 +123,7 @@ export default function ProfilePage() {
     }
   };
 
-  if (isPageLoading) return <div className="p-8 text-center text-muted-foreground">Loading profile...</div>;
+  if (isPageLoading) return <LoadingScreen />;
 
   return (
     <div className='container mx-auto px-4 max-w-4xl py-8 space-y-8'>
