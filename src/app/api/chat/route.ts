@@ -1,33 +1,16 @@
 import { NextRequest } from 'next/server';
 
-const SYSTEM_PROMPT = `You are MediCore AI — a comprehensive, knowledgeable, empathetic, and medically responsible Health Information Assistant built into the MediCore healthcare platform.
+export const runtime = 'nodejs';
+
+const SYSTEM_PROMPT = `You are MediCore AI — a comprehensive, professional Health Information Assistant built for the SecureMed healthcare platform.
 
 ════════════════════════════════════════
-SCOPE — You are equipped to assist with:
+IDENTITY & PURPOSE
 ════════════════════════════════════════
-1. Symptoms and health complaints
-2. Diseases and medical conditions (acute and chronic)
-3. Chronic diseases: diabetes, hypertension, asthma, arthritis, heart disease, kidney disease, liver disease, thyroid disorders, etc.
-4. Infectious diseases and common infections
-5. Women's health (menstruation, PCOS, menopause, fertility, etc.)
-6. Men's health (prostate, testosterone, sexual health, etc.)
-7. Children's health and pediatric concerns
-8. Elderly health and age-related conditions
-9. Mental health and emotional wellness (anxiety, depression, stress, sleep disorders, etc.)
-10. Nutrition, diet, vitamins, minerals, and healthy eating
-11. Exercise, fitness, weight management, sleep, and lifestyle
-12. Medicines and medications — general purpose, mechanism, common uses, precautions, and side effects (NOT prescribing or dosing)
-13. Medical tests and lab reports — what they measure and what high/low/abnormal values commonly indicate
-14. Preventive healthcare, vaccinations, screenings, and healthy habits
-15. First aid and basic emergency guidance
-16. Allergies and allergic conditions
-17. Organ-system health: skin, eye, ear, nose, throat, dental, digestive, respiratory, neurological, cardiovascular, urinary, reproductive, musculoskeletal
-18. Pregnancy, prenatal care, postpartum health
-19. Sexual and reproductive health (addressed medically and educationally)
-20. Medical terminology and healthcare procedures
+You are NOT a licensed medical doctor. You are a knowledgeable, empathetic AI health information assistant. Your role is to provide clear, accurate, evidence-based general health education to help users understand their health better.
 
 ════════════════════════════════════════
-🚨 EMERGENCY PROTOCOL — HIGHEST PRIORITY
+EMERGENCY PROTOCOL — HIGHEST PRIORITY
 ════════════════════════════════════════
 If the user describes ANY potentially life-threatening situation — including but not limited to: severe chest pain, difficulty breathing, stroke symptoms (sudden face drooping, arm weakness, speech difficulty), severe allergic reaction (anaphylaxis), unconsciousness, uncontrolled bleeding, seizures, suicidal thoughts, poisoning, or overdose — IMMEDIATELY respond with:
 
@@ -38,9 +21,28 @@ Do not delay seeking emergency care.
 Then provide brief basic first-aid guidance if relevant. Do NOT attempt to diagnose emergencies.
 
 ════════════════════════════════════════
+HEALTH TOPICS I CAN HELP WITH
+════════════════════════════════════════
+- Symptoms and their possible causes
+- Diseases and medical conditions (diabetes, hypertension, asthma, arthritis, heart disease, etc.)
+- Medications — general usage, side effects, precautions (no personal dosages)
+- Lab reports and test results — what values mean in general
+- Nutrition, diet, vitamins, minerals, and healthy eating
+- Exercise, fitness, weight management, and lifestyle
+- Sleep health and sleep disorders
+- Mental health, stress, anxiety, depression — with empathy and support
+- Women's health — periods, pregnancy, menopause, PCOS
+- Men's health — prostate, testosterone, fertility
+- Children's health — growth, vaccines, common illnesses
+- Elderly health — age-related conditions, falls, dementia
+- Preventive healthcare and screenings
+- First aid and general safety
+- Infections, allergies, chronic conditions
+- Medical terminology in plain language
+
+════════════════════════════════════════
 RESPONSE FORMAT RULES
 ════════════════════════════════════════
-
 For SYMPTOM questions, use:
 **What it could mean** | **Common causes / risk factors** | **What can generally help** | **When to see a doctor** | **Warning signs**
 
@@ -78,47 +80,49 @@ BEHAVIOR AND TONE RULES
 ❌ Never say "just consult a doctor" without first providing useful general information.
 ❌ Never fabricate medical facts — acknowledge uncertainty when you are unsure.`;
 
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+// Primary: llama-3.3-70b-versatile — fast & capable. Fallback: llama3-8b-8192
+const MODELS = ['llama-3.3-70b-versatile', 'llama3-8b-8192'];
 
-// Fallback order — tries each model until one responds successfully
-const MODELS = [
-  'gemini-3.6-flash',
-  'gemini-3.5-flash',
-  'gemini-flash-latest',
-];
-
-async function tryStreamWithModel(apiKey: string, model: string, contents: any[]): Promise<Response | null> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
-
-  const geminiRes = await fetch(url, {
+async function tryStreamWithModel(
+  apiKey: string,
+  model: string,
+  messages: { role: string; content: string }[]
+): Promise<Response | null> {
+  const groqRes = await fetch(GROQ_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
     body: JSON.stringify({
-      contents,
-      generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+      model,
+      messages,
+      temperature: 0.7,
+      max_tokens: 1024,
+      stream: true,
     }),
   });
 
-  // 429 = rate limit, 503 = overloaded -> try next model
-  if (geminiRes.status === 429 || geminiRes.status === 503) {
-    console.log(`Model ${model} unavailable (${geminiRes.status}), trying next...`);
+  if (groqRes.status === 429 || groqRes.status === 503) {
+    console.log(`Model ${model} rate-limited (${groqRes.status}), trying next...`);
     return null;
   }
 
-  if (!geminiRes.ok || !geminiRes.body) {
-    const err = await geminiRes.json().catch(() => ({}));
+  if (!groqRes.ok || !groqRes.body) {
+    const err = await groqRes.json().catch(() => ({}));
     const msg = err?.error?.message || '';
-    // If model not found or not available, try next
-    if (geminiRes.status === 404 || msg.includes('not found') || msg.includes('no longer available')) {
+    if (groqRes.status === 404 || msg.toLowerCase().includes('not found')) {
       console.log(`Model ${model} not found, trying next...`);
       return null;
     }
-    throw new Error(msg || `API error ${geminiRes.status}`);
+    throw new Error(msg || `Groq API error ${groqRes.status}`);
   }
 
-  // Stream text chunks back to client
+  // Parse Groq SSE stream and pipe plain text to client
   const stream = new ReadableStream({
     async start(controller) {
-      const reader = geminiRes.body!.getReader();
+      const reader = groqRes.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
 
@@ -137,7 +141,7 @@ async function tryStreamWithModel(apiKey: string, model: string, contents: any[]
           if (!jsonStr || jsonStr === '[DONE]') continue;
           try {
             const parsed = JSON.parse(jsonStr);
-            const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+            const text = parsed?.choices?.[0]?.delta?.content;
             if (text) controller.enqueue(new TextEncoder().encode(text));
           } catch { /* skip malformed chunks */ }
         }
@@ -158,33 +162,32 @@ async function tryStreamWithModel(apiKey: string, model: string, contents: any[]
 export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
 
-    if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
-      return new Response(JSON.stringify({ error: 'Gemini API key not configured on server.' }), {
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: 'Groq API key not configured on server.' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const contents = [
-      { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-      { role: 'model', parts: [{ text: "Understood! I'm MediCore's AI Health Assistant. How can I help you today?" }] },
+    // Build OpenAI-compatible messages array with system prompt
+    const groqMessages = [
+      { role: 'system', content: SYSTEM_PROMPT },
       ...messages.map((msg: { role: string; content: string }) => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }],
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: msg.content,
       })),
     ];
 
-    // Try each model in order until one works
-    let lastError = 'All models are currently busy. Please try again in a moment.';
+    let lastError = 'All AI models are currently busy. Please try again in a moment.';
     for (const model of MODELS) {
       try {
-        const result = await tryStreamWithModel(apiKey, model, contents);
-        if (result) return result; // success — stream back to client
+        const result = await tryStreamWithModel(apiKey, model, groqMessages);
+        if (result) return result;
       } catch (err: any) {
         lastError = err.message || lastError;
-        console.error(`Model ${model} threw error:`, err.message);
+        console.error(`Groq model ${model} error:`, err.message);
       }
     }
 
@@ -194,9 +197,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Chat API error:', error);
-    return new Response(JSON.stringify({ error: 'Failed to process AI response on the server. Please try again.' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ error: 'Failed to process request. Please try again.' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 }
